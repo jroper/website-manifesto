@@ -3,6 +3,7 @@ package controllers
 import play.api.mvc.{Action, Controller}
 import org.apache.commons.codec.digest.DigestUtils
 import play.api.templates.Html
+import models.Version
 
 /**
  * Serves the main pages of the application
@@ -23,9 +24,19 @@ object Application extends Controller {
   }
 
   /**
-   * The index page. Because it's a val, the index only gets rendered once.
+   * The index page.
    */
-  val index = cached(views.html.index())
+  val index = cached(Version.latest.template())
+
+  /**
+   * A specific version of the manifesto.
+   */
+  def version(name: String) = {
+    Version.fromName(name) match {
+      case Some(version) => cached(version.template())
+      case None => Action(Redirect(routes.Application.index()))
+    }
+  }
 
   /**
    * The list page.

@@ -1,6 +1,6 @@
 import actors.SignatoriesCache
 import akka.actor.Props
-import controllers.HeadAction
+import controllers.{routes, HeadAction}
 import play.api.libs.concurrent.Akka
 import play.api.mvc._
 import play.api.{Logger, Application, GlobalSettings}
@@ -40,6 +40,6 @@ object Global extends GlobalSettings {
 
   override def onHandlerNotFound(request: RequestHeader) = {
     // Redirect all unknown URLs to the index page.
-    Results.Redirect("/")
+    Results.Redirect(controllers.routes.Application.index())
   }
 }

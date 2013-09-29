@@ -15,7 +15,7 @@ import scala.util.control.Exception._
 object AdminController extends Controller {
 
   case class FormattedSignatory(id: String, name: String, provider: String, providerId: String,
-                                providerScreenName: String, signed: String, avatarUrl: String)
+                                providerScreenName: String, signed: String, version: String, avatarUrl: String)
 
   lazy val settings = GitHubController.settings
 
@@ -111,8 +111,9 @@ object AdminController extends Controller {
         case LinkedIn(id) => ("linkedin", id, "")
       }
       val signed = sig.signed.map(_.toString(DateTimeFormat.forPattern("yyyy/MM/dd HH:mm"))).getOrElse("")
+      val version = sig.version.map(_.name).getOrElse("")
       val avatarUrl = sig.avatarUrl.getOrElse("")
-      FormattedSignatory(sig.id.stringify, sig.name, provider, id, screenName, signed, avatarUrl)
+      FormattedSignatory(sig.id, sig.name, provider, id, screenName, signed, version, avatarUrl)
     })
   }
 
@@ -128,7 +129,7 @@ object AdminController extends Controller {
     Async {
       getFormatedSigs.map { sigs =>
         Ok(sigs.map { sig =>
-          s"""${sig.id},"${sig.name}",${sig.provider},${sig.providerId},"${sig.providerScreenName}",${sig.signed},"${sig.avatarUrl}""""
+          s"""${sig.id},"${sig.name}",${sig.provider},${sig.providerId},"${sig.providerScreenName}",${sig.signed},${sig.version},"${sig.avatarUrl}""""
         }.mkString("\n")).as("text/csv").withHeaders("Content-Disposition" -> "attachment;filename=signatories.csv")
       }
     }

@@ -8,7 +8,6 @@ import scala.concurrent.Future
 import play.api.libs.concurrent.Execution.Implicits._
 import play.api.libs.json.Json
 import play.api._
-import models.Formats.signatoryFormat
 
 /**
  * Twitter login provider
@@ -50,7 +49,7 @@ object TwitterController extends Controller {
               val userInfo = UserService.OAuthUser(models.Twitter(id, screenName), name, avatar)
               UserService.findOrSaveUser(userInfo).map { signatory =>
                 // Log the user in and return their details
-                Ok(views.html.popup()).withSession("user" -> signatory.id.stringify)
+                Ok(views.html.popup()).withSession("user" -> signatory.id)
               }
             } else {
               Logger.error("Unable to get user details from Twitter, got response: " +

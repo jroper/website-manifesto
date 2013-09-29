@@ -17,11 +17,11 @@
             </ul>
 
             <table>
-                <tr><th>Id</th><th>Name</th><th>Provider</th><th>Provider ID</th><th>Provider Screen Name</th><th>Date signed</th></tr>
+                <tr><th>Id</th><th>Name</th><th>Provider</th><th>Provider ID</th><th>Provider Screen Name</th><th>Date signed</th><th>Version signed</th></tr>
                 @for(sig <- signatories) {
                     <tr>
                         <td>@sig.id</td><td>@sig.name</td><td>@sig.provider</td><td>@sig.providerId</td>
-                        <td>@sig.providerScreenName</td><td>@sig.signed</td>
+                        <td>@sig.providerScreenName</td><td>@sig.signed</td><td>@sig.version</td>
                     </tr>
                 }
             </table>

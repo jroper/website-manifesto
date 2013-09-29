@@ -5,7 +5,6 @@ import scala.concurrent.Future
 import services.UserService
 import play.api.libs.json.Json
 
-import models.Formats.signatoryFormat
 import play.api.libs.concurrent.Execution.Implicits._
 
 /**

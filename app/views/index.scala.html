@@ -1,3 +1,5 @@
+@(version: Version)(manifestoVersion: Html)(manifestoContents: Html)(manifesto: Html)
+
 @main {
     <div id="headerMinimized"></div>
     <div id="sign">
@@ -53,15 +55,23 @@
 
             <aside>
                 <p>
-                    @manifestoVersion()
+                    @manifestoVersion
                 </p>
+                <div>
+                    All versions:
+                    <ul>
+                        @for(version <- Version.all) {
+                            <li><a href="@routes.Application.version(version.name)">@version.name</a></li>
+                        }
+                    </ul>
+                </div>
                 <div class="social">
                     <a href="https://twitter.com/share" class="twitter-share-button">Tweet</a>
                     <iframe src="//www.facebook.com/plugins/like.php?href=http%3A%2F%2Freactivemanifesto.org&amp;send=false&amp;layout=button_count&amp;width=450&amp;show_faces=false&amp;font&amp;colorscheme=light&amp;action=like&amp;height=21&amp;appId=17899947359" scrolling="no" frameborder="0" style="border:none; overflow:hidden; width:450px; height:21px;" allowTransparency="true"></iframe>
                     <div class="g-plus" data-action="share" data-annotation="bubble" data-href="http://reactivemanifesto.org"></div><br/>
                     <script type="IN/Share" data-url="http://reactivemanifesto.org" data-counter="right"></script>
                 <p>
-                    <a class="pdf" href="@routes.Assets.at("pdf/the-reactive-manifesto-1.1.pdf")">Download as PDF</a>
+                    <a class="pdf" href="@routes.Assets.at("pdf/the-reactive-manifesto-" + version.name + ".pdf")">Download as PDF</a>
                 </p>
                 <p>
                     <a class="pdf" href="https://github.com/reactivemanifesto/reactivemanifesto/blob/master/README.md">Suggest improvements</a>
@@ -70,7 +80,7 @@
             </aside>
 
             <nav id="table">
-                @manifestoContents()
+                @manifestoContents
             </nav>
 
             <div class="sign">
@@ -92,7 +102,7 @@
 
         <article>
 
-            @manifesto()
+            @manifesto
 
             <div class="sign">
                 <button data-bind="click: signTheManifesto, clickBubble: false">Sign the manifesto</button>

@@ -50,7 +50,7 @@ trait OAuth2Controller extends Controller {
               } yield {
                 // Return the page for the popup that will communicate back to the main page what the user is,
                 // and then close itself.
-                Ok(views.html.popup()).withSession("user" -> signatory.id.stringify)
+                Ok(views.html.popup()).withSession("user" -> signatory.id)
               }).recover {
                 case NonFatal(t) => {
                   Logger.warn("Error logging in user to " + name, t)

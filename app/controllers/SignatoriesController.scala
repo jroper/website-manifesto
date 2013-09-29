@@ -12,7 +12,7 @@ import reactivemongo.bson.BSONObjectID
 import scala.concurrent.duration._
 
 import play.api.Play.current
-import models.Formats.signatoryFormat
+import models.Version
 
 /**
  * Provides access to signatories.  All access to the signatories is through an actor, which ensures consistent caching.
@@ -81,12 +81,16 @@ object SignatoriesController extends Controller with MongoController {
   /**
    * Sign the manifesto
    */
-  def sign = Action { req =>
+  def sign(version: Option[String]) = Action { req =>
     req.session.get("user") match {
-      case Some(id) => AsyncResult((signatoriesActor ? Sign(new BSONObjectID(id))).map {
-        case Updated(signatory) => Ok(Json.toJson(signatory))
-        case UpdateFailed(msg) => NotFound(Json.toJson(Json.obj("error" -> msg)))
-      })
+      case Some(id) => AsyncResult(
+        (
+          signatoriesActor ? Sign(new BSONObjectID(id), version.flatMap(Version.fromName).getOrElse(Version.latest))
+        ).map {
+          case Updated(signatory) => Ok(Json.toJson(signatory))
+          case UpdateFailed(msg) => NotFound(Json.toJson(Json.obj("error" -> msg)))
+        }
+      )
       case None => Forbidden
     }
   }

@@ -1,7 +1,7 @@
 package actors
 
 import akka.actor.{ActorRef, Actor}
-import models.Signatory
+import models.{Version, Signatory}
 import reactivemongo.bson.BSONObjectID
 import play.api.Logger
 import scala.util._
@@ -31,7 +31,7 @@ object SignatoriesCache {
    *
    * @param id The id of the user that is signing the manifesto.
    */
-  case class Sign(id: BSONObjectID)
+  case class Sign(id: BSONObjectID, version: Version)
 
   /**
    * Remove a signature from the manifesto.  Will return an Updated or UpdateFailed message.
@@ -155,9 +155,9 @@ class SignatoriesCache extends Actor {
       the error and converting it to an "Unknown error" message for the user.
      */
 
-    case Sign(oid) => {
+    case Sign(oid, version) => {
       val from = sender
-      UserService.sign(oid).recover {
+      UserService.sign(oid, version).recover {
         case NonFatal(e) => {
           Logger.error("Error signing " + oid, e)
           Left("Unknown error")

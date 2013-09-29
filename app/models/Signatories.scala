@@ -1,30 +1,30 @@
 package models
 
 import reactivemongo.bson._
-import reactivemongo.bson.Macros._
+import play.modules.reactivemongo.json.BSONFormats._
 import org.joda.time.DateTime
 import play.api.libs.json._
 import play.api.libs.functional.syntax._
-import scala.util.control.NonFatal
+import play.api.templates.Html
+import org.joda.time.format.DateTimeFormat
 
 /**
  * A signatory
  *
- * @param _id The internal id of the signatory
+ * @param id The internal id of the signatory
  * @param provider The provider specific ID of the signatory
  * @param name The name
  * @param avatarUrl The URL of the signatories avatar
  * @param signed The date the signatory signed, if they signed
  */
 case class Signatory(
-  _id: BSONObjectID,
+  id: String,
   provider: Provider,
   name: String,
   avatarUrl: Option[String],
-  signed: Option[DateTime]
-) {
-  def id = _id
-}
+  signed: Option[DateTime],
+  version: Option[Version]
+)
 
 /**
  * A login provider
@@ -37,101 +37,97 @@ case class Google(id: String) extends Provider
 case class LinkedIn(id: String) extends Provider
 
 /**
- * Reactive mongo handlers
+ * A version of the manifesto
  */
-object Handlers {
-  implicit val githubHandler = handler[GitHub]
-  implicit val twitterHandler = handler[Twitter]
-  implicit val googleHandler = handler[Google]
-  implicit val linkedInHandler = handler[LinkedIn]
+case class Version private (name: String, releaseDate: DateTime, template: () => Html)
 
-  implicit object dateTimeHandler extends BSONHandler[BSONDateTime, DateTime] {
-    def read(time: BSONDateTime) = new DateTime(time.value)
-    def write(jdtime: DateTime) = BSONDateTime(jdtime.getMillis)
+object Version {
+
+  private val format = DateTimeFormat.forPattern("yyyy-MM-dd")
+
+  val v1_0 = new Version("1.0", format.parseDateTime("2013-07-15"), () => views.html.manifesto_1_0())
+  val v1_1 = new Version("1.1", format.parseDateTime("2013-09-23"), () => views.html.manifesto_1_1())
+
+  val all = Seq(v1_0, v1_1)
+  val latest = v1_1
+  def fromName(name: String) = name match {
+    case "1.0" => Some(v1_0)
+    case "1.1" => Some(v1_1)
+    case other => None
   }
 
-  /**
-   * Provides polymorphic serialisation and deserialisation of providers
-   */
-  implicit lazy val providerHandler = new BSONHandler[BSONDocument, Provider] {
-
-    def readProvider[T](bson: BSONDocument)(implicit reader: BSONDocumentReader[T]): T = bson.getAs[T]("details").get
-
-    def read(bson: BSONDocument) = bson.getAs[String]("id") match {
-      case Some("github") => readProvider[GitHub](bson)
-      case Some("twitter") => readProvider[Twitter](bson)
-      case Some("google") => readProvider[Google](bson)
-      case Some("linkedin") => readProvider[LinkedIn](bson)
-      case unknown => throw new IllegalArgumentException("Unknown provider: " + unknown)
-    }
-
-    def writeProvider[T](id: String, provider: T)(implicit writer: BSONDocumentWriter[T]) = BSONDocument(
-      "id" -> id,
-      "details" -> writer.write(provider)
-    )
-
-    def write(provider: Provider) = provider match {
-      case gh: GitHub => writeProvider("github", gh)
-      case t: Twitter => writeProvider("twitter", t)
-      case g: Google => writeProvider("google", g)
-      case ln: LinkedIn => writeProvider("linkedin", ln)
-    }
-  }
-
-  implicit lazy val signatoryHandler = handler[Signatory]
+  implicit val versionFormat = Format[Version](
+    Reads(js => js.validate[String].flatMap(name => fromName(name) match {
+      case Some(version) => JsSuccess(version)
+      case None => JsError("Unknown version: " + name)
+    })),
+    Writes[Version](v => JsString(v.name))
+  )
 }
 
-/**
- * JSON formats
- */
-object Formats {
+// Formats
+object Signatory {
+  implicit val signatoryFormat = Json.format[Signatory]
 
-  implicit lazy val bsonObjectIdFormat = new Format[BSONObjectID] {
-    def reads(json: JsValue) = json match {
-      case JsString(v) => try {
-        JsSuccess(new BSONObjectID(v))
-      } catch {
-        case NonFatal(e) => JsError("Cannot parse object id from " + v)
+  val dbSignatoryFormat: Format[Signatory] = (
+    (__ \ "_id").format[BSONObjectID] ~
+    (__ \ "provider").format[Provider] ~
+    (__ \ "name").format[String] ~
+    (__ \ "avatarUrl").formatNullable[String] ~
+    (__ \ "signed").formatNullable[BSONDateTime] ~
+    (__ \ "version").formatNullable[Version]
+  ).apply({
+    case (id, provider, name, avatarUrl, signed, version) =>
+      val migratedVersion = version.orElse {
+        signed.map {
+          case v1_1 if Version.v1_1.releaseDate.getMillis < v1_1.value => Version.v1_1
+          case v1_0 => Version.v1_0
+        }
       }
-      case _ => JsError("Cannot parse object id from " + json)
-    }
+      Signatory(id.stringify, provider, name, avatarUrl, signed.map(dt => new DateTime(dt.value)), migratedVersion)
+  }, (s: Signatory) =>
+    (BSONObjectID(s.id), s.provider, s.name, s.avatarUrl, s.signed.map(dt => BSONDateTime(dt.getMillis)), s.version)
+  )
+}
 
-    def writes(oid: BSONObjectID) = JsString(oid.stringify)
-  }
+object Provider {
+  private def readProvider[T : Reads](json: JsValue): JsSuccess[T] = JsSuccess((json \ "details").as[T])
+  private def writeProvider[T : Writes](id: String, provider: T) = Json.obj(
+    "id" -> id,
+    "details" -> provider
+  )
 
-  implicit val githubFormat = Json.format[GitHub]
-  implicit val twitterFormat = Json.format[Twitter]
-  implicit val googleFormat = Json.format[Google]
-  implicit val linkedInFormat = Json.format[LinkedIn]
-
-  /**
-   * Provides polymorphic serialisation and deserialisation of providers
-   */
-  implicit lazy val providerFormat = new Format[Provider] {
-
-    def readProvider[T](json: JsValue)(implicit reads: Reads[T]): JsSuccess[T] = JsSuccess((json \ "details").as[T])
-
-    def reads(json: JsValue): JsResult[Provider] = (json \ "id").asOpt[String] match {
+  implicit val providerFormat: Format[Provider] = Format[Provider](
+    Reads(json => (json \ "id").asOpt[String] match {
       case Some("github") => readProvider[GitHub](json)
       case Some("twitter") => readProvider[Twitter](json)
       case Some("google") => readProvider[Google](json)
       case Some("linkedin") => readProvider[LinkedIn](json)
       case unknown => JsError("Unknown provider: " + unknown)
+    }),
+    Writes {
+      case gh: GitHub => writeProvider("github", gh)(GitHub.githubFormat)
+      case t: Twitter => writeProvider("twitter", t)(Twitter.twitterFormat)
+      case g: Google => writeProvider("google", g)(Google.googleFormat)
+      case ln: LinkedIn => writeProvider("linkedin", ln)(LinkedIn.linkedInFormat)
     }
-
-    def writeProvider[T](id: String, provider: T)(implicit writes: Writes[T]) = Json.obj(
-      "id" -> id,
-      "details" -> provider
-    )
-
-    def writes(provider: Provider) = provider match {
-      case gh: GitHub => writeProvider("github", gh)
-      case t: Twitter => writeProvider("twitter", t)
-      case g: Google => writeProvider("google", g)
-      case ln: LinkedIn => writeProvider("linkedin", ln)
-    }
-  }
-
-  implicit lazy val signatoryFormat = Json.format[Signatory]
+  )
 }
+
+object GitHub {
+  implicit val githubFormat: Format[GitHub] = Json.format[GitHub]
+}
+
+object Twitter {
+  implicit val twitterFormat: Format[Twitter] = Json.format[Twitter]
+}
+
+object Google {
+  implicit val googleFormat: Format[Google] = Json.format[Google]
+}
+
+object LinkedIn {
+  implicit val linkedInFormat: Format[LinkedIn] = Json.format[LinkedIn]
+}
+
 
